@@ -1,0 +1,8 @@
+*__pycache__/
+.env
+venv/
+*.pyc
+.DS_Store
+*.log
+(archived)mixpanel_kpi_JQL
+service-account-gsheet.json
