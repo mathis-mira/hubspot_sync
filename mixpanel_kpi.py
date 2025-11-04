@@ -3,7 +3,7 @@ from typing import Dict, Optional, Set, Union
 
 from dotenv import load_dotenv
 
-from utilities.hupspot_api import HubSpotConnector
+from utilities.hubspot_api import HubSpotConnector
 from utilities.mixpanel_api import MixpanelConnector
 
 

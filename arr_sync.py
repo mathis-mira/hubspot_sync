@@ -28,8 +28,7 @@ def main():
     hubspot = HubSpotConnector()
     gsheet = GSheetConnector()
 
-    # Clear line item import sheet
-    gsheet.clear_selected_columns(spreadsheet_id, sheet_name_clear, columns_to_clear)
+    
 
     # Search for active deals in HubSpot
     active_deals = hubspot.search_deals_stage_id(stage_ids)
@@ -50,12 +49,21 @@ def main():
 
         # Get line items for this deal
         assoc_data = hubspot.get_associations("deals", deal_id, "line_items")
-        if not assoc_data or "results" not in assoc_data:
-            logger.warning(f"No line items found for deal {deal_id}")
+        if assoc_data is None:
+            logger.error("Job aborted due to association retrieval failure for deal %s.", deal_id)
+            return
+
+        assoc_results = assoc_data.get("results")
+        if assoc_results is None:
+            logger.error("Job aborted due to malformed association payload for deal %s.", deal_id)
+            return
+
+        if not assoc_results:
+            logger.warning("No line items associated with deal %s; continuing to next deal.", deal_id)
             continue
 
         # Process each line item for this deal
-        for assoc in assoc_data.get("results", []):
+        for assoc in assoc_results:
             line_item_id = assoc.get("id")
             if not line_item_id:
                 continue
@@ -63,8 +71,8 @@ def main():
             # Get line item properties
             line_item_data = hubspot.get_line_item_by_id(line_item_id,)
             if not line_item_data or "properties" not in line_item_data:
-                logger.error(f"Could not retrieve properties for line item ID: {line_item_id}")
-                continue
+                logger.error(f"Job aborted due to line item retrieval failure for line item ID: {line_item_id}")
+                return
 
             li_props = line_item_data.get("properties", {})
 
@@ -115,6 +123,8 @@ def main():
             row_index += 1
 
     if sheet_updates:
+        # Clear line item import sheet
+        gsheet.clear_selected_columns(spreadsheet_id, sheet_name_clear, columns_to_clear)
         total_rows = len(sheet_updates)
         logger.info("Prepared %d rows for Google Sheets update.", total_rows)
 
@@ -158,6 +168,9 @@ def main():
         result = hubspot.update_company_properties(str(company_id), properties)
         if result:
             updated_count += 1
+        else:
+            logger.error("Aborting company updates due to failure updating company ID %s.", company_id)
+            return
 
     if updated_count:
         logger.info("Updated %d companies in HubSpot.", updated_count)
